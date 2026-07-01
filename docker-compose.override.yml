@@ -1,0 +1,16 @@
+services:
+  gateway_service:
+    volumes:
+      - ./tmp:/shared
+
+  downloader_service:
+    volumes:
+      - ./tmp:/shared
+
+  converter_service:
+    volumes:
+      - ./tmp:/shared
+
+  transcriber_service:
+    volumes:
+      - ./tmp:/shared

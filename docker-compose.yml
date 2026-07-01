@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  gateway_service:
+    build: ./gateway_service
+    container_name: gateway_service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - downloader_service
+      - converter_service
+      - transcriber_service
+      - mongo
+    environment:
+      DownloaderHost: downloader_service
+      ConverterHost: converter_service
+      TranscriberHost: transcriber_service
+      mongo_url: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DB_NAME}?authSource=admin
+      UploadedFilesDir: /shared/uploaded_files
+      DOWNLOADER_OUTPUT_DIR: /shared/downloader_output
+      CONVERTER_OUTPUT_DIR: /shared/converter_output
+      TRANSCRIBER_OUTPUT_DIR: /shared/transcriber_output
+      UPLOADED_FILES_DIR: /shared/uploaded_files
+    volumes:
+      - ./gateway_service:/app
+      - shared_data:/shared
+
+  web_ui_service:
+    build: ./web_ui_service
+    container_name: web_ui_service
+    ports:
+      - "7999:7999"
+    depends_on:
+      - gateway_service
+    environment:
+      PYTHONUNBUFFERED: "1"
+      HOST: gateway_service
+    volumes:
+      - ./web_ui_service:/app
+      - shared_data:/shared
+
+  downloader_service:
+    build: ./downloader_service
+    container_name: downloader_service
+    ports:
+      - "8001:8001"
+    environment:
+      TEMP_DIR_OUTPUT: /shared/downloader_output
+    volumes:
+      - ./downloader_service:/app
+      - shared_data:/shared
+
+  converter_service:
+    build: ./converter_service
+    container_name: converter_service
+    ports:
+      - "8002:8002"
+    environment:
+       TEMP_DIR_OUTPUT: /shared/converter_output
+       PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./converter_service:/app
+      - shared_data:/shared
+
+  transcriber_service:
+    build: ./transcriber_service
+    container_name: transcriber_service
+    ports:
+      - "8003:8003"
+    environment:
+      TEMP_DIR_OUTPUT: /shared/transcriber_output
+    volumes:
+      - ./transcriber_service:/app
+      - shared_data:/shared
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+volumes:
+  shared_data:
+  mongo_data:

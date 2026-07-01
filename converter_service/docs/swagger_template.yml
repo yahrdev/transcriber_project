@@ -1,0 +1,37 @@
+swagger: "2.0"
+info:
+  title: Converter API
+  version: "1.0.0"
+  description: |
+    This API converts media files between formats.
+
+    ### Error Codes
+    | Code | HTTP Status | Message |
+    |------|--------------|---------|
+    | `FILE_WRONG_TYPE` | 400 | The file {path} is not a supported media file. |
+    | `WRONG_CONVERSION` | 422 | No converter for {from_ext} → {to_ext}. |
+    | `FILE_NOT_FOUND_PATH` | 404 | The file was not found at the path {path}. |
+    | `INVALID_FILE_PATH` | 422 | Invalid file path {path}. Make sure it includes a valid filename and extension (e.g., .mp4). |
+    | `EXTENSION_MISMATCH` | 422 | Extracted extension from file_path ({ext}) does not equal to the specified '{expected}'. |
+    | `UNSUPPORTED_EXTENSION` | 422 | Unsupported extension: {value}. Supported: {supported}. |
+    | `INTERNAL_ERROR` | 500 | Internal Server Error. |
+    | `ROUTE_NOT_FOUND` | 404 | The requested URL was not found on the server. |
+    | `VALIDATION_ERROR` | 400 | One or more request fields are invalid. The message will contain detailed field errors. |
+tags:
+  - name: Conversion
+    description: File conversion operations
+  # - name: Files
+  #   description: Serving converted files
+schemes:
+  - http
+paths: {} 
+definitions:
+  Message:
+    type: object
+    properties:
+      message:
+        type: string
+        example: "A description of the error"
+      code:
+        type: string
+        example: "ERROR_CODE"

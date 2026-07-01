@@ -1,0 +1,6 @@
+{
+    "video": ["mp4", "mov", "avi"],
+    "audio": ["mp3", "wav", "aac"],
+    "document": ["pdf", "docx", "txt"]
+  }
+  
