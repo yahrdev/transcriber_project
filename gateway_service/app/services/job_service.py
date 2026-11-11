@@ -5,6 +5,7 @@ Provides business logic for job management.
 
 from datetime import datetime
 import app.models.job_schemas as job_models
+from app.exceptions.exceptions import AppError
 
 class JobService:
     def __init__(self, settings):
@@ -12,10 +13,29 @@ class JobService:
         self.job_db = Jobs_Collection(settings=settings)
 
     def get_file_path_name_by_job_id(self, job_id):
+
+        """
+        Returns the result file path and name for a completed job.
+
+        The job is processed in the background, so the result may not be ready yet.
+        In this case (pending/processing) or if the job failed, 409 Conflict is raised.
+        """
+
         job = self.job_db.get(job_id=job_id)
-        return job.result_file_path, job.file_name
+        if job.status == "completed":
+            return job.result_file_path, job.file_name
+        elif job.status in ["processing", "pending"]:
+            raise AppError("NOT_FINISHED")
+        elif job.status == "failed":
+            raise AppError("JOB_FAILED")
+             
+            
+
     
     def get_job_status(self, job_id):
+
+        """Returns the current job status. Used by clients for polling."""
+
         job = self.job_db.get(job_id=job_id)
         return job.status
 

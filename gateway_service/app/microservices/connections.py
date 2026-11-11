@@ -16,7 +16,7 @@ def create_and_post(
     response_model: Type[BaseModel],
     url: str,
     service_name: str,
-    timeout: int = 30,
+    timeout: tuple = (20, 3600),
                     ) -> BaseModel:
     
 

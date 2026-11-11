@@ -14,3 +14,7 @@ services:
   transcriber_service:
     volumes:
       - ./tmp:/shared
+
+  celery_worker:
+    volumes:
+      - ./tmp:/shared

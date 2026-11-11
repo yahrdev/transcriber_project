@@ -14,5 +14,5 @@ def is_url(filepath: str) -> bool:
         try:
             result = urlparse(filepath)
             return all([result.scheme in ("http", "https"), result.netloc])
-        except:
+        except Exception:
             return False

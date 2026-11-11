@@ -1,94 +1,85 @@
 """
 test_create_job_upload.py
 
-Tests for the /jobs endpoint.
+Tests for the POST /jobs/upload endpoint.
 """
 
-import pytest
-from tests.integration.data.gateway_file_test_cases import upload_endpoint_test_cases as cases 
-import tests.shared_helpers.testing_constants as tc
-import tests.shared_helpers.models as models
-import os
 import mimetypes
+import os
+
+import pytest
 import requests
+
+from tests.integration.data.gateway_file_test_cases import upload_endpoint_test_cases as cases
 from tests.integration.helpers.utils import create_microservices_mocks
+import tests.shared_helpers.models as models
 
 
-def test_200_case(client, settings, mock_pipeline_clients):
-    """"
-    Happy path: successful transcribing
-    """
-    
-    create_microservices_mocks(mock_pipeline_clients)
-    case = cases.get("valid_upload")
-    client_id = "123"
-    language = case.get("language")
-    disk_file = case.get("disk_file")
-    filename = case.get("upload_filename")
-    test_file_path = os.path.join(
-                                    settings.TEST_FOLDER,
-                                    disk_file
-                                )
+def post_upload(client, settings, case):
+    """Sends the file described in the test case to POST /jobs/upload."""
+    test_file_path = os.path.join(settings.TEST_FOLDER, case.get("disk_file"))
     content_type = mimetypes.guess_type(test_file_path)[0]
 
-
     with open(test_file_path, "rb") as f:
-        response = client.post("/jobs/upload", data={
-                                                    "client_id": client_id,
-                                                    "language": language,
-                                                                        },
-                                                                        files={
-                                                                            "file": (filename, f, content_type)
-                                                                        }
-                                
-                            )    
-    assert response.status_code == case["expected_status_code"] 
-    response_json = response.json()
-    response_model = models.PostResponseData(**response_json)
-    assert response_model.data.result_url == tc.TEST_TRANSCRIBE_PATH
+        return client.post("/jobs/upload",
+                           data={"client_id": "123", "language": case.get("language")},
+                           files={"file": (case.get("upload_filename"), f, content_type)})
+
+
+def test_202_case(client, settings, mock_pipeline_clients, queued_tasks):
+    """
+    Happy path: the file is accepted and the job is put in the queue.
+    """
+    create_microservices_mocks(mock_pipeline_clients)
+    case = cases.get("valid_upload")
+
+    response = post_upload(client, settings, case)
+
+    assert response.status_code == case["expected_status_code"]
+    response_model = models.PostResponseData(**response.json())
+    assert response_model.data is None
+
+    upload_delay, _ = queued_tasks
+    upload_delay.assert_called_once()
+    assert upload_delay.call_args.kwargs["job_id"] == str(response_model.job_id)
+
+    status = client.get(f"/jobs/{response_model.job_id}/status").json()
+    assert status["status"] == "pending"
 
 
 @pytest.mark.parametrize("case_name, testing_case", cases.items())
-def test_post_upload_errors(client, case_name, testing_case, settings, mock_pipeline_clients):
-    if case_name != "valid_upload":
-        
-        mock_pipeline_error = testing_case.get("mock_pipeline_error")
-        if mock_pipeline_error == "CONNECTION_ERROR":
-            create_microservices_mocks(mock_pipeline_clients, 
-                                       converter_side_effect=requests.exceptions.ConnectionError())
-        else:
-            create_microservices_mocks(mock_pipeline_clients)
-        client_id = "123"
-        language = testing_case.get("language")
-        disk_file = testing_case.get("disk_file")
-        filename = testing_case.get("upload_filename")
-        if filename:
-            test_file_path = os.path.join(
-                                            settings.TEST_FOLDER,
-                                            disk_file
-                                        )
-        else:
-            test_file_path = ""
-        content_type = mimetypes.guess_type(test_file_path)[0]
+def test_post_upload_errors(client, case_name, testing_case, settings, mock_pipeline_clients, queued_tasks):
+    """
+    Validation errors are returned by the API immediately; nothing is put in the queue.
+    """
+    if case_name == "valid_upload":
+        pytest.skip("happy path is tested separately")
 
-        with open(test_file_path, "rb") as f:
-            response = client.post("/jobs/upload", data={
-                                                        "client_id": client_id,
-                                                        "language": language,
-                                                                            },
-                                                                            files={
-                                                                                "file": (filename, f, content_type)
-                                                                            }
-                                
-                    )        
-        assert response.status_code == testing_case["expected_status_code"] 
-        response_json = response.json()
-        response_model = models.Message(**response_json)
-        assert response_model.code == testing_case["expected_error_code"]         
+    create_microservices_mocks(mock_pipeline_clients)
 
-        
-                                                            
-#pytest tests/integration/test_create_job_upload.py -v
-#pytest tests/integration/test_create_job_upload.py::test_200_case -v
+    response = post_upload(client, settings, testing_case)
+
+    assert response.status_code == testing_case["expected_status_code"]
+    response_model = models.Message(**response.json())
+    assert response_model.code == testing_case["expected_error_code"]
+
+    upload_delay, _ = queued_tasks
+    upload_delay.assert_not_called()
 
 
+def test_worker_error(client, settings, mock_pipeline_clients, inline_tasks):
+    """
+    The converter fails inside the worker: the API still answers 202,
+    the error is visible only through the job status.
+    """
+    create_microservices_mocks(mock_pipeline_clients,
+                               converter_side_effect=requests.exceptions.ConnectionError())
+
+    response = post_upload(client, settings, cases.get("valid_upload"))
+
+    assert response.status_code == 202
+    job_id = response.json()["job_id"]
+    assert client.get(f"/jobs/{job_id}/status").json()["status"] == "failed"
+
+
+# pytest tests/integration/test_create_job_upload.py -v

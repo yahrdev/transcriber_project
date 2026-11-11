@@ -19,7 +19,10 @@ ERROR_MESSAGES = {
     "INVALID_LANGUAGE_FORMAT": "The language {value} is invalid",
     "FILE_WRONG_TYPE": "The file should be video or audio type",
     "INVALID_FILE_EXTENSION": "Invalid file extension {file}. Make sure it includes a valid extension (e.g., .mp3).",
-    "REQUEST_SERIALIZATION_ERROR": "Invalid request to the microservice {value}"
+    "REQUEST_SERIALIZATION_ERROR": "Invalid request to the microservice {value}",
+    "NOT_FINISHED": "The process has not been finished yet",
+    "JOB_FAILED": "The process was failed",
+    "BIG_FILE": "The file is too large"
 }
 
 STATUS_MAP = {
@@ -34,7 +37,10 @@ STATUS_MAP = {
     "INVALID_LANGUAGE_FORMAT": 422,
     "FILE_WRONG_TYPE": 422,
     "INVALID_FILE_EXTENSION": 422,
-    "REQUEST_SERIALIZATION_ERROR": 500
+    "REQUEST_SERIALIZATION_ERROR": 500,
+    "NOT_FINISHED": 409,
+    "JOB_FAILED": 409,
+    "BIG_FILE": 413
 
 }
 

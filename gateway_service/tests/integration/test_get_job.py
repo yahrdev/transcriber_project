@@ -1,129 +1,110 @@
 """
 test_get_job.py
 
-Tests for the "/jobs/{job_id}/result/download" endpoint.
+Tests for GET /jobs/{job_id}/status and GET /jobs/{job_id}/result/download.
 """
 
-
-from tests.integration.data.gateway_file_test_cases import reference_endpoint_test_cases as post_cases 
-from tests.integration.data.gateway_file_test_cases import download_result_endpoint_test_cases as get_cases
-import tests.shared_helpers.testing_constants as tc
-import tests.shared_helpers.models as models
-import os
-from tests.integration.helpers.utils import create_microservices_mocks
 import copy
+import os
+
+import requests
+
+from tests.integration.data.gateway_file_test_cases import reference_endpoint_test_cases as post_cases
+from tests.integration.data.gateway_file_test_cases import download_result_endpoint_test_cases as get_cases
+from tests.integration.helpers.utils import create_microservices_mocks
+import tests.shared_helpers.models as models
 
 
+def create_job(client, settings, mock_pipeline_clients, downloader_side_effect=None):
+    """Creates a job through POST /jobs. Returns (job_id, path of the expected result file)."""
+    json_data = copy.deepcopy(post_cases["valid_reference"]["request_json"])
+    json_data["source"] = os.path.join(settings.TEST_FOLDER, json_data["source"])
+    result_path = os.path.join(settings.TEST_FOLDER,
+                               get_cases["completed_job_existing_file"]["result_disk_file"])
 
-def test_200_case_download(client, settings, mock_pipeline_clients):
-    """"
-    Happy path: successful transcribing
-    """
-    
-    post_case = post_cases.get("valid_reference")
-    json_data = copy.deepcopy(post_case["request_json"])
-    downloader_file_path = None
-    if "source" in json_data:
-        json_data["source"] = os.path.join(
-            settings.TEST_FOLDER,
-            json_data["source"]
-        )
-        downloader_file_path=json_data["source"]
-    get_case = get_cases.get("completed_job_existing_file")
-    transcriber_file_path = None
-    if "result_disk_file" in get_case:
-        transcriber_file_path = os.path.join(
-            settings.TEST_FOLDER,
-            get_case["result_disk_file"])
-    create_microservices_mocks(mock_pipeline_clients, 
-                 downloader_file_path=downloader_file_path,
-                 transcriber_file_path = transcriber_file_path)
+    create_microservices_mocks(mock_pipeline_clients,
+                               downloader_file_path=json_data["source"],
+                               downloader_side_effect=downloader_side_effect,
+                               transcriber_file_path=result_path)
+
     response = client.post("/jobs", json=json_data)
+    assert response.status_code == 202
+    return response.json()["job_id"], result_path
 
-    response_json = response.json()
-    response_model = models.PostResponseData(**response_json)
-    url = "/jobs/{job_id}/result/download".format(job_id = response_model.job_id)
 
-    
+def assert_error(response, case):
+    assert response.status_code == case["expected_status_code"]
+    response_model = models.Message(**response.json())
+    assert response_model.code == case["expected_error_code"]
 
-    response = client.get(url=url)
-    assert response.status_code == get_case["expected_status_code"]
-    assert response.headers["content-type"].startswith(get_case["expected_content_type"])
-    with open(response_model.data.result_url, "r", encoding="utf-8") as f:
+
+# ---------- download ----------
+
+def test_200_case_download(client, settings, mock_pipeline_clients, inline_tasks):
+    """The worker has finished: the file is returned."""
+    case = get_cases["completed_job_existing_file"]
+    job_id, result_path = create_job(client, settings, mock_pipeline_clients)
+
+    response = client.get(f"/jobs/{job_id}/result/download")
+
+    assert response.status_code == case["expected_status_code"]
+    assert response.headers["content-type"].startswith(case["expected_content_type"])
+    with open(result_path, "r", encoding="utf-8") as f:
         expected_text = f.read()
     assert expected_text[:10] in response.text
 
 
+def test_409_download_not_finished(client, settings, mock_pipeline_clients):
+    """The job is still in the queue: 409 NOT_FINISHED instead of 500."""
+    job_id, _ = create_job(client, settings, mock_pipeline_clients)
+
+    response = client.get(f"/jobs/{job_id}/result/download")
+
+    assert_error(response, get_cases["job_not_finished"])
+
+
+def test_409_download_failed(client, settings, mock_pipeline_clients, inline_tasks):
+    """The job failed in the worker: 409 JOB_FAILED."""
+    job_id, _ = create_job(client, settings, mock_pipeline_clients,
+                           downloader_side_effect=requests.exceptions.ConnectionError())
+
+    response = client.get(f"/jobs/{job_id}/result/download")
+
+    assert_error(response, get_cases["job_failed"])
 
 
 def test_get_wrong_job_download(client):
-
-    get_case = get_cases.get("job_not_found")
-
-    url = "/jobs/{job_id}/result/download".format(job_id = get_case["job_id"])
-
-    response = client.get(url=url)
-    assert response.status_code == get_case["expected_status_code"] 
-    response_json = response.json()
-    response_model = models.Message(**response_json)
-    assert response_model.code == get_case["expected_error_code"] 
+    case = get_cases["job_not_found"]
+    response = client.get(f"/jobs/{case['job_id']}/result/download")
+    assert_error(response, case)
 
 
-def test_200_case_status(client, settings, mock_pipeline_clients):
-    """"
-    Happy path: successful transcribing
-    """
-    
-    post_case = post_cases.get("valid_reference")
-    json_data = copy.deepcopy(post_case["request_json"])
-    downloader_file_path = None
-    if "source" in json_data:
-        json_data["source"] = os.path.join(
-            settings.TEST_FOLDER,
-            json_data["source"]
-        )
-        downloader_file_path=json_data["source"]
-    get_case = get_cases.get("completed_job_existing_file")
-    transcriber_file_path = None
-    if "result_disk_file" in get_case:
-        transcriber_file_path = os.path.join(
-            settings.TEST_FOLDER,
-            get_case["result_disk_file"])
-    create_microservices_mocks(mock_pipeline_clients, 
-                 downloader_file_path=downloader_file_path,
-                 transcriber_file_path = transcriber_file_path)
-    response = client.post("/jobs", json=json_data)
+# ---------- status ----------
 
-    response_json = response.json()
-    response_model = models.PostResponseData(**response_json)
-    url = "/jobs/{job_id}/status".format(job_id = response_model.job_id)
+def test_status_pending(client, settings, mock_pipeline_clients):
+    """Right after POST the job waits in the queue."""
+    job_id, _ = create_job(client, settings, mock_pipeline_clients)
 
-    
+    response = client.get(f"/jobs/{job_id}/status")
 
-    response = client.get(url=url)
-    assert response.status_code == get_case["expected_status_code"]
-    response_json = response.json()
-    response_model = models.ResponseStatusModel(**response_json)
-    assert response_model.status == "completed"
+    assert response.status_code == 200
+    assert response.json()["status"] == "pending"
 
 
+def test_status_completed(client, settings, mock_pipeline_clients, inline_tasks):
+    """After the worker has finished the status is 'completed'."""
+    job_id, _ = create_job(client, settings, mock_pipeline_clients)
+
+    response = client.get(f"/jobs/{job_id}/status")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
 
 
 def test_get_wrong_job_status(client):
-
-    get_case = get_cases.get("job_not_found")
-
-    url = "/jobs/{job_id}/status".format(job_id = get_case["job_id"])
-
-    response = client.get(url=url)
-    assert response.status_code == get_case["expected_status_code"] 
-    response_json = response.json()
-    response_model = models.Message(**response_json)
-    assert response_model.code == get_case["expected_error_code"] 
-
-        
-                                                            
-#pytest tests/integration/test_get_job.py -v
-#pytest tests/integration/test_get_job.py::test_200_case -v
+    case = get_cases["job_not_found"]
+    response = client.get(f"/jobs/{case['job_id']}/status")
+    assert_error(response, case)
 
 
+# pytest tests/integration/test_get_job.py -v

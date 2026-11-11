@@ -17,7 +17,7 @@ def register_router(app, settings):
     router = APIRouter()
     job_pipeline = JobPipeline(settings=settings)
 
-    @router.post("/jobs", responses={
+    @router.post("/jobs", status_code=202, responses={
         400: {
             "description": (
                 "Bad Request. "
@@ -45,14 +45,18 @@ def register_router(app, settings):
         - **source**: media source reference, URL, or file path available to the service
         - **language**: transcription language in ISO-639-1 format, for example "uk" or "en"
 
-        The source is validated, downloaded or resolved by the downloader service,
-        converted to audio, transcribed, and saved as a job result.
+        The job is created with status "pending" and put into the Celery queue.
+        The response (202) contains only job_id, the processing runs in the background:
+        the worker downloads the source, converts it to audio and transcribes it.
+
+        Use /jobs/{job_id}/status to check the progress
+        and /jobs/{job_id}/result/download to get the result.
         """
         
-        return job_pipeline.process_reference(data)
+        return job_pipeline.start_reference(data)
     
     
-    @router.post("/jobs/upload", responses={
+    @router.post("/jobs/upload", status_code=202, responses={
         400: {
             "description": (
                 "Bad Request. "
@@ -83,8 +87,12 @@ def register_router(app, settings):
         - **language**: transcription language in ISO-639-1 format, for example "uk" or "en"
         - **file**: uploaded audio or video file
 
-        The uploaded file is validated, saved to temporary storage,
-        converted to audio, transcribed, and saved as a job result.
+        The uploaded file is validated and saved to the shared storage,
+        then the job is put into the Celery queue.
+        The response (202) contains only job_id, the worker converts
+        and transcribes the file in the background.
+
+        Files bigger than MAX_UPLOAD_MB are rejected with 413 (BIG_FILE).
         """
 
         request.state.form_data = {
@@ -94,7 +102,7 @@ def register_router(app, settings):
             "content_type": file.content_type,
                                 }
         
-        return job_pipeline.process_upload(client_id=client_id, 
+        return job_pipeline.start_upload(client_id=client_id, 
                                           language=language,
                                           file=file)
     
@@ -116,7 +124,8 @@ def register_router(app, settings):
 
         - **job_id**: identifier of the transcription job
 
-        Returns the generated text file if the job result exists.
+        Returns the generated text file if the job is completed.
+        If the job is still in progress (NOT_FINISHED) or failed (JOB_FAILED), returns 409.
         """
         request.state.params = {
                                 "job_id": job_id
@@ -147,6 +156,8 @@ def register_router(app, settings):
 
         - **job_id**: identifier of the transcription job
 
+        Status values: pending, processing, completed, failed.
+        Clients call this endpoint repeatedly (polling) until the job is finished.
         """
         request.state.params = {
                                 "job_id": job_id

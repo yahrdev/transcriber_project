@@ -40,15 +40,29 @@ def get_file(settings, job_id):
     url = urljoin(settings.http_base, url)
     return process_file(method="get", url=url)
 
+def get_status(settings, job_id):
+
+    """
+    Requests the current job status from the API gateway.
+    Used by the progress page for polling.
+    """
+
+    url=f"/jobs/{job_id}/status"
+    url = urljoin(settings.http_base, url)
+
+    response = process_file(method="get", url=url)
+    return response.json()
+
+
    
 
 
 def process_file(method: Literal["get", "post"], url, data = None, files = None):
     try:
         if method == "post":
-            response = requests.post(url, data=data, files = files, timeout=20)   
+            response = requests.post(url, data=data, files = files, timeout=(10, 3600))   
         elif method == "get":
-            response = requests.get(url,  timeout=20)
+            response = requests.get(url,  timeout=(10, 3600))
 
     except requests.RequestException as e:
         raise MicroserviceError(

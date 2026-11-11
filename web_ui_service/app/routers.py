@@ -1,4 +1,4 @@
-from flask import render_template, request, Response
+from flask import render_template, request, Response, jsonify
 import app.backend_service.gateway_client as gc
 
 
@@ -48,12 +48,12 @@ def register_routes(app, settings):
             1. Reads uploaded file and form fields from the request.
             2. Validates that a file was provided.
             3. Sends the file to api_gateway_service through gateway_client.
-            4. Receives job_id from the gateway.
-            5. Renders the result page with a download link.
+            4. Receives job_id from the gateway (the job is processed in the background).
+            5. Renders the progress page, which polls the job status.
 
         Returns:
             200:
-                HTML result page with download button.
+                HTML progress page.
 
             400:
                 Plain text response if no file was uploaded.
@@ -78,11 +78,46 @@ def register_routes(app, settings):
             content_type=uploaded_file.content_type
         )
 
+        return render_template("progress.html", job_id=job_id)
+
+        
+
+
+    @app.route("/status/<job_id>", methods=["GET"])
+    def get_status(job_id):
+        """
+        Returns the job status from the API gateway as JSON.
+
+        Path parameters:
+            job_id (str):
+                Identifier of the transcription job.
+
+        Used by the JavaScript on the progress page for polling.
+
+        Returns:
+            200:
+                JSON with job_id and status
+                (pending, processing, completed, failed).
+        """
+        data = gc.get_status(settings=settings, job_id=job_id)
+        return jsonify(data)
+
+    @app.route("/result/<job_id>", methods=["GET"])
+    def get_result(job_id):
+        """
+        Renders the result page with a download button.
+
+        The progress page redirects here when the job is completed.
+
+        Returns:
+            200:
+                HTML result page with download button.
+        """
         return render_template(
-            "result.html",
-            job_id=job_id,
-            download_url=f"/download/{job_id}"
-        )
+                    "result.html",
+                    job_id=job_id,
+                    download_url=f"/download/{job_id}"
+                )
 
     @app.route("/download/<job_id>", methods=["GET"])
     def download_file(job_id):

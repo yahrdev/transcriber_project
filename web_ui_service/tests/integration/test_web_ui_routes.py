@@ -47,8 +47,8 @@ def test_upload_success(client):
         )
 
         assert response.status_code == 200
-        assert b"Transcription completed" in response.data
-        assert b"/download/test-job-id" in response.data
+        assert b"Processing" in response.data                   # progress page is shown
+        assert b'const jobId = "test-job-id"' in response.data  # job_id is passed to the polling script
 
         mock_post_file.assert_called_once()
 
@@ -100,5 +100,23 @@ def test_download_success(client):
         mock_get_file.assert_called_once()
 
 
+
+def test_status_success(client):
+    with patch("app.routers.gc.get_status") as mock_get_status:
+        mock_get_status.return_value = {"job_id": "test-job-id", "status": "processing"}
+
+        response = client.get("/status/test-job-id")
+
+        assert response.status_code == 200
+        assert response.json["status"] == "processing"
+        mock_get_status.assert_called_once()
+
+
+def test_result_page(client):
+    response = client.get("/result/test-job-id")
+
+    assert response.status_code == 200
+    assert b"Transcription completed" in response.data
+    assert b"/download/test-job-id" in response.data
 
     #pytest tests/integration -v

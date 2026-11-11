@@ -1,8 +1,7 @@
-version: "3.9"
-
 services:
   gateway_service:
     build: ./gateway_service
+    image: transcriber-gateway
     container_name: gateway_service
     ports:
       - "8000:8000"
@@ -11,6 +10,7 @@ services:
       - converter_service
       - transcriber_service
       - mongo
+      - redis
     environment:
       DownloaderHost: downloader_service
       ConverterHost: converter_service
@@ -56,8 +56,8 @@ services:
     ports:
       - "8002:8002"
     environment:
-       TEMP_DIR_OUTPUT: /shared/converter_output
-       PYTHONUNBUFFERED: "1"
+      TEMP_DIR_OUTPUT: /shared/converter_output
+      PYTHONUNBUFFERED: "1"
     volumes:
       - ./converter_service:/app
       - shared_data:/shared
@@ -72,6 +72,7 @@ services:
     volumes:
       - ./transcriber_service:/app
       - shared_data:/shared
+
   mongo:
     image: mongo:7
     container_name: mongo
@@ -82,6 +83,40 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongo_data:/data/db
+
+  # Redis is the message broker for Celery: it keeps the queue of transcription tasks
+  redis:
+    image: redis:7
+    container_name: redis
+
+  # Celery worker: takes tasks from Redis and runs the processing in the background.
+  # Uses the same image and code as gateway_service, only the start command is different.
+  # --concurrency=2: max 2 jobs at the same time, because audio processing keeps the whole file in memory
+  celery_worker:
+    image: transcriber-gateway
+    container_name: celery_worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - gateway_service
+      - redis
+      - mongo
+      - downloader_service
+      - converter_service
+      - transcriber_service
+    environment:
+      DownloaderHost: downloader_service
+      ConverterHost: converter_service
+      TranscriberHost: transcriber_service
+      mongo_url: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DB_NAME}?authSource=admin
+      UploadedFilesDir: /shared/uploaded_files
+      DOWNLOADER_OUTPUT_DIR: /shared/downloader_output
+      CONVERTER_OUTPUT_DIR: /shared/converter_output
+      TRANSCRIBER_OUTPUT_DIR: /shared/transcriber_output
+      UPLOADED_FILES_DIR: /shared/uploaded_files
+    volumes:
+      - ./gateway_service:/app
+      - shared_data:/shared
+
 volumes:
   shared_data:
   mongo_data:

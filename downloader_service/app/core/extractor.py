@@ -56,7 +56,7 @@ class FileExtractor(ABC):
                 return ResponseData(file_path = tmp_path,
                                     file_name=file_name,
                                     file_extension=file_extension)
-            except:
+            except Exception:
                 self.file_manager.clear_temp_file(file_path = tmp_path)
                 raise
         

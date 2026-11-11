@@ -36,9 +36,10 @@ class TestSettings:
             STORAGE_TYPE = "local"
             TOOLS_FOLDER = "tools"
 
-            mongo_url = mongo_url = "mongodb://admin:56342200@localhost:27017/?authSource=admin"
+            mongo_url = mongo_url = "mongodb://admin:test_password@localhost:27017/?authSource=admin"
             db_name = "test_gateway_db"
             collection_name = "test_jobs"
+            MAX_UPLOAD_MB = 100
 
             DOWNLOADER_OUTPUT_DIR = tempfile.mkdtemp()
             CONVERTER_OUTPUT_DIR = tempfile.mkdtemp()

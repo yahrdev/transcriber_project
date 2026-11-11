@@ -1,0 +1,174 @@
+name: transcriber CI
+
+on: [push, pull_request]
+
+jobs:
+  converter_tests:
+    name: Converter Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: converter_service
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests/unit -p "*.py" -v
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v
+  
+  downloader_tests:
+    name: Downloader Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: downloader_service
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Probe sample URL
+        run: |
+          sudo apt-get update && sudo apt-get install -y curl dnsutils
+          echo "Check DNS:"
+          dig +short filesamples.com || true
+          echo "HEAD (v4, follow redirects):"
+          curl -4 -I -L https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4 || true
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests/unit -p "*.py" -v
+      - name: Run integration tests
+        run: pytest tests/integration -v
+
+  transcriber_tests:
+    name: Transcriber Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: transcriber_service
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests/unit -p "*.py" -v
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v
+
+  gateway_tests:
+    name: Gateway Service Tests
+    runs-on: ubuntu-latest
+
+    # Test MongoDB for integration tests (Redis is not needed: .delay() is mocked)
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: test_password
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: gateway_service
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests/unit -p "*.py" -v
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v
+
+  web_tests:
+    name: Web Service Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web_ui_service
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests/unit -p "*.py" -v
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v

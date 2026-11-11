@@ -1,0 +1,56 @@
+# Virtual environments
+**/venv/
+**/env/
+**/.venv/
+**/TranscribeVenv/
+**/GateVenv/
+**/WebVenv/
+.GateVenv/
+
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Logs
+*.log
+
+# IDE settings (VS Code, PyCharm, etc.)
+**/.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Test artifacts (optional)
+*.pytest_cache/
+htmlcov/
+
+
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+
+# Generated data
+converter_output/
+downloader_output/
+transcriber_output/
+uploaded_files/
+
+
+
+
+
+# Environment files with real secrets (use .env.example as a template)
+
+.env
+
+**/.env
+
+!**/.env.example

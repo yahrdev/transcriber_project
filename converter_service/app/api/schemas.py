@@ -94,5 +94,5 @@ def check_supported_extensions(value: str):
     }
     if value.lower() not in supported_exts:
         raise AppError("UNSUPPORTED_EXTENSION", value = value, supported = ', '.join(supported_exts))
-
+        
 

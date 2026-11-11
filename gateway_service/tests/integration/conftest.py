@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 import os
 from pymongo import MongoClient
 from unittest.mock import patch, Mock
+from app.services.job_pipeline import JobPipeline
 
 s = TestSettings.generate()
 db_client = MongoClient(s.mongo_url)
@@ -73,4 +74,42 @@ def mock_pipeline_clients():
         patch("app.services.job_pipeline.M.TranscriberClient") as MockTranscriber,
     ):
         yield MockDownloader, MockConverter, MockTranscriber
+
+
+UPLOAD_DELAY = "app.tasks.transcribe_upload_job.delay"
+REFERENCE_DELAY = "app.tasks.transcribe_reference_job.delay"
+
+
+@pytest.fixture(autouse=True)
+def queued_tasks():
+    """
+    Default for every test: Celery tasks are only "put in the queue" (mocked).
+    Nothing is executed, Redis is not needed, jobs stay 'pending'.
+    """
+    with (
+        patch(UPLOAD_DELAY) as upload_delay,
+        patch(REFERENCE_DELAY) as reference_delay,
+    ):
+        yield upload_delay, reference_delay
+
+@pytest.fixture
+def inline_tasks(settings, mock_pipeline_clients, queued_tasks):
+    """
+    Simulates a Celery worker: .delay() runs the task immediately in the same process.
+    Like in a real worker, errors do not reach the API: they are visible only
+    through the job status ('failed').
+    """
+    def run_now(method_name):
+        def _run(**kwargs):
+            pipeline = JobPipeline(settings)
+            try:
+                getattr(pipeline, method_name)(**kwargs)
+            except Exception:
+                pass
+        return _run
+
+    upload_delay, reference_delay = queued_tasks
+    upload_delay.side_effect = run_now("run_upload")
+    reference_delay.side_effect = run_now("run_reference")
+    yield
 

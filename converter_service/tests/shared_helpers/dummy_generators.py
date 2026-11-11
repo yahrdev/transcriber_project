@@ -15,5 +15,5 @@ def create_dummy_video(path):
             "-shortest", path,
             "-y"
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    except:
+    except Exception:
         raise ValueError("Cannot generate dummy video")

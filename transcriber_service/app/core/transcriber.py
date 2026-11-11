@@ -24,7 +24,7 @@ class Transcriber(ABC):
         self.file_manager = file_manager or get_file_manager(settings)
         self._settings = settings
 
-    def transcribe(self, audio_file_path: str, audio_file_name: str, target_extension = "txt", language="uk", chunk_duration=60) -> ResponseData:
+    def transcribe(self, audio_file_path: str, audio_file_name: str, target_extension = "txt", language="en", chunk_duration=60) -> ResponseData:
 
         """
         Returns:
@@ -55,16 +55,17 @@ class Transcriber(ABC):
 
         client = self.get_client()
         audio = AudioSegment.from_file(audio_file_path, format=current_extension)
-        duration = int(audio.duration_seconds)
-        total_chunks = math.ceil(duration / chunk_duration)
+        duration_ms = len(audio)
+        chunk_ms = chunk_duration * 1000
+        total_chunks = math.ceil(duration_ms / chunk_ms)
 
         transcript = []  
         subfolder_name = f"{uuid.uuid4()}"
         try:
             tmp_path = ""
             for i in range(total_chunks):
-                start_time_chunk = i * chunk_duration
-                chunk = audio[start_time_chunk * 1000:(start_time_chunk + chunk_duration) * 1000]
+                start_ms = i * chunk_ms
+                chunk = audio[start_ms:start_ms + chunk_ms]
                 
                 
                 chunk_path, filename = self.file_manager.create_tmp_file_path(current_extension, 
@@ -85,10 +86,10 @@ class Transcriber(ABC):
             # Save to file
             self.file_manager.save_to_tmp(tmp_path, transcript)
             return ResponseData(file_path = tmp_path)
-        except:
+        except Exception:
             if tmp_path:
                 self.file_manager.clear_temp_file(file_path = tmp_path)
-                raise
+            raise
         finally:
             self.file_manager.clear_temp_folders(subfolder=subfolder_name)
             # Always remove chunk files even if transcription fails.
@@ -123,14 +124,16 @@ class TranscribeByAPI(Transcriber):
                             language=language
                         )
             return response.text
-        except APIError as e:
-            raise AppError("TRANSCRIBER_API_ERROR", value = str(e))
 
         except APIConnectionError as e:
             raise AppError("TRANSCRIBER_CONNECTION_ERROR", value = str(e))
-
+        
         except RateLimitError:
             raise AppError("TRANSCRIBER_RATE_LIMIT")
+        except APIError as e:
+            raise AppError("TRANSCRIBER_API_ERROR", value = str(e))
+
+        
 
     
 

@@ -103,7 +103,7 @@ class ConvertVideoAudio(Converter):
                 print("\n Finished:", output_path)
 
             return Output(file_path=output_path, file_name=file_name, file_extension=extension_to)
-        except:
+        except Exception:
             self.file_manager.clear_temp_file(file_path = output_path)
             raise
         

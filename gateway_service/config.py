@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 
 class Settings(BaseSettings):
     settings_name: str = "prod_settings"
+    MAX_UPLOAD_MB: int = 100
     DownloaderURL: str
     ConverterURL: str
     TranscriberURL: str
@@ -37,6 +38,8 @@ class Settings(BaseSettings):
     CONVERTER_OUTPUT_DIR: str
     TRANSCRIBER_OUTPUT_DIR: str
     UPLOADED_FILES_DIR: str
+    REDIS_URL: str
+    
 
     model_config = ConfigDict(env_file = ".env")
 

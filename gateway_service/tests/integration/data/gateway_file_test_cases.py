@@ -4,7 +4,7 @@ upload_endpoint_test_cases = {
         "upload_filename": "testvideo.mp4",
         "language": "en",
         "mock_pipeline_error": None,
-        "expected_status_code": 200,
+        "expected_status_code": 202,
         "expected_fields": ["job_id", "data.result_url"],
     },
 
@@ -36,16 +36,6 @@ upload_endpoint_test_cases = {
     },
 
 
-    "converter_failed": {
-        "disk_file": "testvideo.mp4",
-        "upload_filename": "testvideo.mp4",
-        "language": "en",
-        "mock_pipeline_error": "CONNECTION_ERROR",
-        "expected_status_code": 500,
-        "expected_error_code": "INTERNAL_ERROR",
-        "expected_job_status": "failed",
-    },
-
 }
 
 
@@ -58,7 +48,7 @@ reference_endpoint_test_cases = {
             "language": "en",
         },
         "mock_pipeline_error": None,
-        "expected_status_code": 200,
+        "expected_status_code": 202,
         "expected_fields": ["job_id", "data.result_url"],
     },
 
@@ -118,18 +108,6 @@ reference_endpoint_test_cases = {
         "expected_error_code": "INVALID_LANGUAGE_FORMAT",
     },
 
-    "downloader_unavailable": {
-        "request_json": {
-            "client_id": "test_client",
-            "source_type": "path",
-            "source": "testvideo.mp4",
-            "language": "en",
-        },
-        "mock_pipeline_error": "CONNECTION_ERROR",
-        "expected_status_code": 500,
-        "expected_error_code": "INTERNAL_ERROR",
-    },
-
 }
 
 
@@ -145,5 +123,15 @@ download_result_endpoint_test_cases = {
         "job_id": "missing_job",
         "expected_status_code": 500,
         "expected_error_code": "INTERNAL_ERROR",
+    },
+
+        "job_not_finished": {
+        "expected_status_code": 409,
+        "expected_error_code": "NOT_FINISHED",
+    },
+
+    "job_failed": {
+        "expected_status_code": 409,
+        "expected_error_code": "JOB_FAILED",
     },
 }
