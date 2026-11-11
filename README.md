@@ -21,6 +21,7 @@ The project consists of five microservices:
 - GitHub Actions
 - Pytest
 - OpenAI Whisper API
+- Celery
 
 ## Project Structure
 
